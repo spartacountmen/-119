@@ -1,0 +1,1025 @@
+<h1>안녕</h1>
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>쿨픽스(CoolFix) - 에어컨 수리 역경매 & 내비게이션</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Noto Sans KR', sans-serif;
+            background-color: #eef2f6;
+        }
+        /* 스크롤바 커스텀 */
+        ::-webkit-scrollbar {
+            width: 5px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 10px;
+        }
+        @keyframes pulse-ring {
+            0% { transform: scale(0.85); opacity: 0.8; }
+            70% { transform: scale(1.6); opacity: 0; }
+            100% { transform: scale(1.6); opacity: 0; }
+        }
+        .pulse-marker::before {
+            content: '';
+            position: absolute;
+            inset: -6px;
+            border-radius: 9999px;
+            background-color: #2563eb;
+            animation: pulse-ring 1.8s infinite ease-out;
+            z-index: -1;
+        }
+        .nav-road-grid {
+            background-image: 
+                linear-gradient(to right, rgba(148, 163, 184, 0.15) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(148, 163, 184, 0.15) 1px, transparent 1px);
+            background-size: 32px 32px;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col items-center justify-start py-0 sm:py-6 text-slate-800">
+
+    <!-- 상단 시뮬레이터 컨트롤 바 (모드 전환용) -->
+    <div class="w-full max-w-md bg-slate-900 text-white px-4 py-3 sm:rounded-t-3xl shadow-lg flex flex-col gap-2 z-30">
+        <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2">
+                <span class="bg-blue-500 text-xs font-bold px-2 py-0.5 rounded-full">체험판</span>
+                <span class="font-bold text-sm tracking-tight">쿨픽스(CoolFix) 앱 시뮬레이터</span>
+            </div>
+            <button onclick="resetApp()" class="text-xs bg-slate-700 hover:bg-slate-600 text-slate-200 px-2.5 py-1 rounded-lg transition flex items-center gap-1">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                초기화
+            </button>
+        </div>
+        <!-- 고객 / 업체 모드 스위처 -->
+        <div class="grid grid-cols-2 gap-1.5 bg-slate-800 p-1 rounded-xl">
+            <button id="btn-mode-customer" onclick="switchRole('customer')" class="py-2 px-3 rounded-lg text-xs sm:text-sm font-bold transition flex items-center justify-center gap-1.5 bg-blue-600 text-white shadow">
+                <span>👤</span> 고객 화면
+            </button>
+            <button id="btn-mode-tech" onclick="switchRole('tech')" class="py-2 px-3 rounded-lg text-xs sm:text-sm font-bold transition flex items-center justify-center gap-1.5 text-slate-300 hover:text-white">
+                <span>🔧</span> 수리 업체 화면
+                <span id="tech-badge" class="hidden bg-rose-500 text-white text-[10px] px-1.5 py-0.2 rounded-full">NEW</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- 메인 모바일 앱 프레임 -->
+    <main class="w-full max-w-md bg-white sm:rounded-b-3xl shadow-2xl overflow-hidden flex flex-col min-h-[760px] border-x border-b border-slate-200 relative">
+
+        <!-- 토스트 알림 메시지 박스 (alert 대신 사용) -->
+        <div id="toast-box" class="fixed top-20 left-1/2 -translate-x-1/2 z-50 pointer-events-none opacity-0 transition-all duration-300 w-[90%] max-w-sm">
+            <div class="bg-slate-900/95 text-white text-sm font-medium px-4 py-3 rounded-2xl shadow-xl flex items-center gap-2.5 border border-slate-700">
+                <span id="toast-icon" class="text-lg">✅</span>
+                <span id="toast-text">알림 메시지</span>
+            </div>
+        </div>
+
+        <!-- ===================================================================== -->
+        <!-- 1. 고객 화면 (CUSTOMER VIEW)                                           -->
+        <!-- ===================================================================== -->
+        <div id="view-customer" class="flex-1 flex flex-col">
+            <!-- 앱 헤더 -->
+            <header class="bg-white border-b border-slate-100 px-5 py-4 flex items-center justify-between sticky top-0 z-20">
+                <div>
+                    <div class="flex items-center gap-1.5">
+                        <span class="text-blue-600 font-extrabold text-xl tracking-tight">❄️ 쿨픽스</span>
+                        <span class="text-xs font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md">고객용</span>
+                    </div>
+                    <p class="text-xs text-slate-500 mt-0.5">우리 동네 에어컨 수리 실시간 비교 견적</p>
+                </div>
+                <div class="flex items-center gap-1 text-xs font-medium text-slate-600 bg-slate-100 px-2.5 py-1.5 rounded-full">
+                    <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+                    <span id="customer-step-badge">1단계: 고장 접수</span>
+                </div>
+            </header>
+
+            <!-- 고객 단계별 진행 바 -->
+            <div class="grid grid-cols-3 bg-slate-50 border-b border-slate-100 text-center text-xs font-semibold">
+                <div id="cust-tab-1" class="py-2.5 border-b-2 border-blue-600 text-blue-600">① 증상 입력</div>
+                <div id="cust-tab-2" class="py-2.5 border-b-2 border-transparent text-slate-400">② 견적 비교</div>
+                <div id="cust-tab-3" class="py-2.5 border-b-2 border-transparent text-slate-400">③ 기사 위치/내비</div>
+            </div>
+
+            <!-- [고객 STEP 1] 에어컨 고장 견적 요청 폼 -->
+            <section id="cust-step-1" class="p-5 flex-1 overflow-y-auto space-y-5">
+                <div class="bg-blue-50/80 border border-blue-100 rounded-2xl p-3.5 flex items-start gap-3">
+                    <span class="text-xl">💡</span>
+                    <p class="text-xs text-blue-900 leading-relaxed">
+                        고장 증상만 올리면 주변 수리 기사님들이 <strong>예상 수리비와 방문 가능 시간</strong>을 바로 보내드립니다.
+                    </p>
+                </div>
+
+                <!-- 1. 제조사 선택 -->
+                <div>
+                    <label class="block text-sm font-bold text-slate-800 mb-2">1. 에어컨 제조사</label>
+                    <div class="grid grid-cols-3 gap-2" id="brand-options">
+                        <button type="button" onclick="selectOption('brand', '삼성전자', this)" class="opt-brand py-2.5 px-3 rounded-xl border-2 border-blue-600 bg-blue-50 text-blue-700 font-bold text-sm transition">삼성전자</button>
+                        <button type="button" onclick="selectOption('brand', 'LG전자', this)" class="opt-brand py-2.5 px-3 rounded-xl border border-slate-200 bg-white text-slate-600 font-medium text-sm hover:bg-slate-50 transition">LG전자</button>
+                        <button type="button" onclick="selectOption('brand', '캐리어', this)" class="opt-brand py-2.5 px-3 rounded-xl border border-slate-200 bg-white text-slate-600 font-medium text-sm hover:bg-slate-50 transition">캐리어</button>
+                        <button type="button" onclick="selectOption('brand', '위니아', this)" class="opt-brand py-2.5 px-3 rounded-xl border border-slate-200 bg-white text-slate-600 font-medium text-sm hover:bg-slate-50 transition">위니아</button>
+                        <button type="button" onclick="selectOption('brand', '기타 브랜드', this)" class="opt-brand py-2.5 px-3 rounded-xl border border-slate-200 bg-white text-slate-600 font-medium text-sm hover:bg-slate-50 transition col-span-2">기타 / 잘 모름</button>
+                    </div>
+                </div>
+
+                <!-- 2. 에어컨 종류 -->
+                <div>
+                    <label class="block text-sm font-bold text-slate-800 mb-2">2. 에어컨 형태</label>
+                    <div class="grid grid-cols-2 gap-2" id="type-options">
+                        <button type="button" onclick="selectOption('type', '벽걸이형', this)" class="opt-type py-2.5 px-3 rounded-xl border border-slate-200 bg-white text-slate-600 font-medium text-sm hover:bg-slate-50 transition">벽걸이형</button>
+                        <button type="button" onclick="selectOption('type', '스탠드형', this)" class="opt-type py-2.5 px-3 rounded-xl border-2 border-blue-600 bg-blue-50 text-blue-700 font-bold text-sm transition">스탠드형</button>
+                        <button type="button" onclick="selectOption('type', '2in1 (스탠드+벽걸이)', this)" class="opt-type py-2.5 px-3 rounded-xl border border-slate-200 bg-white text-slate-600 font-medium text-sm hover:bg-slate-50 transition">2in1 멀티형</button>
+                        <button type="button" onclick="selectOption('type', '시스템/천장형', this)" class="opt-type py-2.5 px-3 rounded-xl border border-slate-200 bg-white text-slate-600 font-medium text-sm hover:bg-slate-50 transition">시스템/천장형</button>
+                    </div>
+                </div>
+
+                <!-- 3. 고장 증상 (복수 선택 가능) -->
+                <div>
+                    <label class="block text-sm font-bold text-slate-800 mb-2">3. 고장 증상 <span class="text-xs font-normal text-slate-400">(중복 선택 가능)</span></label>
+                    <div class="flex flex-wrap gap-2" id="symptom-options">
+                        <button type="button" onclick="toggleSymptom('찬바람이 안 나와요', this)" class="sym-btn py-2 px-3.5 rounded-full border-2 border-blue-600 bg-blue-50 text-blue-700 font-bold text-xs transition">❄️ 찬바람이 안 나와요</button>
+                        <button type="button" onclick="toggleSymptom('실내기에서 물이 새요', this)" class="sym-btn py-2 px-3.5 rounded-full border border-slate-200 bg-white text-slate-600 font-medium text-xs hover:bg-slate-50 transition">💧 물이 새요 (누수)</button>
+                        <button type="button" onclick="toggleSymptom('소음/진동이 심해요', this)" class="sym-btn py-2 px-3.5 rounded-full border border-slate-200 bg-white text-slate-600 font-medium text-xs hover:bg-slate-50 transition">🔊 소음이 심해요</button>
+                        <button type="button" onclick="toggleSymptom('전원이 안 켜져요', this)" class="sym-btn py-2 px-3.5 rounded-full border border-slate-200 bg-white text-slate-600 font-medium text-xs hover:bg-slate-50 transition">🔌 전원이 안 켜져요</button>
+                        <button type="button" onclick="toggleSymptom('에러코드 표시됨', this)" class="sym-btn py-2 px-3.5 rounded-full border border-slate-200 bg-white text-slate-600 font-medium text-xs hover:bg-slate-50 transition">⚠️ 에러코드 표시</button>
+                        <button type="button" onclick="toggleSymptom('냉매 가스 충전 필요', this)" class="sym-btn py-2 px-3.5 rounded-full border border-slate-200 bg-white text-slate-600 font-medium text-xs hover:bg-slate-50 transition">⛽ 가스 충전 의심</button>
+                    </div>
+                </div>
+
+                <!-- 4. 방문 주소 및 상세 메모 -->
+                <div class="space-y-3">
+                    <div>
+                        <label class="block text-sm font-bold text-slate-800 mb-1.5">4. 수리 방문 지역 (내비게이션 도착지)</label>
+                        <div class="relative">
+                            <span class="absolute left-3.5 top-3 text-slate-400">📍</span>
+                            <input type="text" id="input-address" value="경남 양산시 물금읍 범어리 2715 (물금신도시)" class="w-full pl-9 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:border-blue-500 focus:bg-white">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-bold text-slate-800 mb-1.5">추가 전달사항 <span class="text-xs font-normal text-slate-400">(선택)</span></label>
+                        <textarea id="input-memo" rows="2" placeholder="예: 실외기가 베란다 난간에 있어요. 오늘 오후 방문 원합니다." class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-blue-500 focus:bg-white">에어컨을 켜면 송풍만 나오고 시원해지지 않습니다. 오늘 빠른 방문 원해요.</textarea>
+                    </div>
+                </div>
+
+                <button onclick="submitCustomerRequest()" class="w-full py-4 bg-blue-600 hover:bg-blue-700 active:scale-[0.99] text-white font-bold rounded-2xl shadow-lg shadow-blue-600/25 transition text-base flex items-center justify-center gap-2">
+                    <span>무료 견적 요청 올리기</span>
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"></path></svg>
+                </button>
+            </section>
+
+            <!-- [고객 STEP 2] 받은 견적서 비교 리스트 -->
+            <section id="cust-step-2" class="hidden p-5 flex-1 overflow-y-auto space-y-4">
+                <!-- 내 요청 요약 카드 -->
+                <div class="bg-slate-900 text-white rounded-2xl p-4 shadow-md">
+                    <div class="flex items-center justify-between mb-1.5">
+                        <span class="text-xs bg-blue-500/30 text-blue-300 border border-blue-400/30 px-2 py-0.5 rounded-md font-semibold">견적 접수 완료</span>
+                        <button onclick="goToCustomerStep(1)" class="text-xs text-slate-300 underline hover:text-white">요청 수정</button>
+                    </div>
+                    <h3 id="summary-title" class="font-bold text-base">삼성전자 스탠드형 · 찬바람이 안 나와요</h3>
+                    <p id="summary-addr" class="text-xs text-slate-300 mt-1 flex items-center gap-1">📍 경남 양산시 물금읍 범어리 2715</p>
+                </div>
+
+                <!-- 정렬 및 안내 바 -->
+                <div class="flex items-center justify-between pt-1">
+                    <p class="text-sm font-bold text-slate-800">도착한 견적 <span id="quote-count" class="text-blue-600">3</span>건</p>
+                    <div class="flex gap-1.5 text-xs">
+                        <button onclick="sortQuotes('price')" id="sort-price" class="px-2.5 py-1 rounded-lg bg-blue-100 text-blue-700 font-bold">낮은 가격순</button>
+                        <button onclick="sortQuotes('dist')" id="sort-dist" class="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-600 font-medium">가까운 거리순</button>
+                    </div>
+                </div>
+
+                <!-- 견적 카드 목록 컨테이너 -->
+                <div id="quotes-list" class="space-y-3 pb-4">
+                    <!-- JS로 렌더링됨 -->
+                </div>
+            </section>
+
+            <!-- [고객 STEP 3] 매칭 완료 & 실시간 기사 위치/내비게이션 확인 -->
+            <section id="cust-step-3" class="hidden flex-1 flex flex-col overflow-y-auto">
+                <!-- 상단 매칭 상태 배너 -->
+                <div class="bg-emerald-600 text-white px-5 py-3.5 flex items-center justify-between">
+                    <div>
+                        <p class="text-xs text-emerald-100 font-medium">수리 업체 매칭 완료</p>
+                        <h3 id="matched-shop-name" class="font-bold text-base">양산쿨에어컨 기사님 출발</h3>
+                    </div>
+                    <div class="text-right">
+                        <span class="text-xs bg-white/20 px-2.5 py-1 rounded-full font-bold" id="cust-eta-badge">약 8분 후 도착</span>
+                    </div>
+                </div>
+
+                <!-- 실시간 기사 이동 지도 시뮬레이터 -->
+                <div class="relative w-full h-64 bg-slate-100 nav-road-grid overflow-hidden border-b border-slate-200">
+                    <!-- SVG 경로 및 도로 라인 -->
+                    <svg class="w-full h-full" viewBox="0 0 400 250" preserveAspectRatio="none">
+                        <!-- 배경 도로망 -->
+                        <path d="M 0 180 L 400 180" stroke="#ffffff" stroke-width="14" />
+                        <path d="M 120 0 L 120 250" stroke="#ffffff" stroke-width="12" />
+                        <path d="M 290 0 L 290 250" stroke="#ffffff" stroke-width="12" />
+                        <path d="M 0 70 L 400 70" stroke="#ffffff" stroke-width="10" />
+                        
+                        <!-- 이동 예정 경로 (점선) -->
+                        <path id="cust-route-bg" d="M 55 180 L 120 180 L 120 70 L 290 70 L 290 140 L 345 140" fill="none" stroke="#93c5fd" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" />
+                        <!-- 지나온 경로 (진한 파란선) -->
+                        <path id="cust-route-active" d="M 55 180 L 120 180 L 120 70 L 290 70 L 290 140 L 345 140" fill="none" stroke="#2563eb" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" />
+                    </svg>
+
+                    <!-- 출발지 (업체 위치) -->
+                    <div class="absolute left-[38px] top-[164px] flex flex-col items-center">
+                        <div class="bg-slate-700 text-white text-[10px] font-bold px-2 py-0.5 rounded shadow">업체 출발</div>
+                        <div class="w-3 h-3 rounded-full bg-slate-700 border-2 border-white mt-0.5"></div>
+                    </div>
+
+                    <!-- 도착지 (고객 집) -->
+                    <div class="absolute right-[30px] top-[102px] flex flex-col items-center">
+                        <div class="bg-rose-600 text-white text-[10px] font-bold px-2 py-0.5 rounded shadow animate-bounce">우리집 (도착)</div>
+                        <div class="w-5 h-5 rounded-full bg-rose-600 border-2 border-white shadow flex items-center justify-center text-[10px] text-white mt-0.5">🏠</div>
+                    </div>
+
+                    <!-- 실시간 이동 중인 기사님 차량 마커 -->
+                    <div id="cust-car-marker" class="absolute transition-all duration-300 ease-linear flex flex-col items-center z-10" style="left: 55px; top: 180px; transform: translate(-50%, -50%);">
+                        <div class="bg-blue-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-md whitespace-nowrap mb-1">
+                            🚚 기사님 이동중
+                        </div>
+                        <div class="relative w-8 h-8 rounded-full bg-blue-600 border-2 border-white shadow-lg flex items-center justify-center text-white text-sm pulse-marker">
+                            🚐
+                        </div>
+                    </div>
+
+                    <!-- 우측 하단 내비게이션 컨트롤 버튼 -->
+                    <div class="absolute bottom-3 left-3 right-3 flex items-center justify-between bg-white/95 backdrop-blur px-3.5 py-2.5 rounded-xl shadow-md border border-slate-200">
+                        <div>
+                            <p class="text-[11px] text-slate-500">남은 거리 <strong id="cust-remain-dist" class="text-slate-800">2.4 km</strong></p>
+                            <p id="cust-nav-status-text" class="text-xs font-bold text-blue-600">물금대로 방면으로 이동 중입니다</p>
+                        </div>
+                        <button onclick="toggleNavSimulation()" id="btn-cust-sim" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-3 py-2 rounded-lg shadow transition">
+                            ▶ 이동 시뮬레이션
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 진행 단계 타임라인 & 업체 상세 카드 -->
+                <div class="p-5 space-y-4">
+                    <!-- 3단계 상태 표시 -->
+                    <div class="grid grid-cols-3 gap-2 text-center">
+                        <div id="status-step-1" class="p-2.5 rounded-xl bg-blue-50 border border-blue-200">
+                            <div class="text-base">📋</div>
+                            <div class="text-xs font-bold text-blue-700 mt-0.5">출발 준비</div>
+                        </div>
+                        <div id="status-step-2" class="p-2.5 rounded-xl bg-blue-600 text-white shadow">
+                            <div class="text-base">🚐</div>
+                            <div class="text-xs font-bold mt-0.5">현장 이동중</div>
+                        </div>
+                        <div id="status-step-3" class="p-2.5 rounded-xl bg-slate-100 text-slate-400">
+                            <div class="text-base">🛠️</div>
+                            <div class="text-xs font-bold mt-0.5">도착 및 수리</div>
+                        </div>
+                    </div>
+
+                    <!-- 선택된 업체 정보 카드 -->
+                    <div class="border border-slate-200 rounded-2xl p-4 space-y-3 bg-white shadow-sm">
+                        <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                            <div>
+                                <div class="flex items-center gap-1.5">
+                                    <h4 id="detail-shop-name" class="font-bold text-base text-slate-900">양산쿨에어컨</h4>
+                                    <span class="text-xs text-amber-500 font-bold">★ <span id="detail-shop-rating">4.9</span></span>
+                                </div>
+                                <p id="detail-shop-tech" class="text-xs text-slate-500 mt-0.5">김민수 마스터 기사 · 경력 12년</p>
+                            </div>
+                            <div class="text-right">
+                                <p class="text-xs text-slate-400">확정 견적가</p>
+                                <p id="detail-shop-price" class="font-extrabold text-lg text-blue-600">75,000원</p>
+                            </div>
+                        </div>
+                        <p id="detail-shop-msg" class="text-xs text-slate-600 bg-slate-50 p-2.5 rounded-xl">
+                            "출장비 포함 금액입니다. 삼성 스탠드 냉매 및 센서 부품 차량에 보유 중이라 당일 바로 수리 가능합니다."
+                        </p>
+                        <div class="grid grid-cols-2 gap-2 pt-1">
+                            <button onclick="showToast('📞 안심번호(0507-1234-5678)로 기사님께 전화를 연결합니다.')" class="py-2.5 px-3 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 transition">
+                                <span>📞</span> 기사님 안심통화
+                            </button>
+                            <button onclick="switchRole('tech')" class="py-2.5 px-3 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 transition">
+                                <span>🧭</span> 기사님 내비 화면 보기
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <!-- ===================================================================== -->
+        <!-- 2. 수리 업체 화면 (TECHNICIAN / PARTNER VIEW)                          -->
+        <!-- ===================================================================== -->
+        <div id="view-tech" class="hidden flex-1 flex flex-col">
+            <!-- 업체용 헤더 -->
+            <header class="bg-slate-900 text-white px-5 py-4 flex items-center justify-between">
+                <div>
+                    <div class="flex items-center gap-1.5">
+                        <span class="text-amber-400 font-extrabold text-lg">🔧 쿨픽스 파트너스</span>
+                        <span class="text-[11px] bg-amber-500/20 text-amber-300 border border-amber-400/30 px-2 py-0.5 rounded-md font-bold">수리업체용</span>
+                    </div>
+                    <p class="text-xs text-slate-400 mt-0.5">양산쿨에어컨 (김민수 기사님) 영업중</p>
+                </div>
+                <div class="flex gap-1.5">
+                    <button onclick="switchTechSubTab('requests')" id="tech-sub-req" class="px-3 py-1.5 rounded-lg text-xs font-bold bg-blue-600 text-white">수리 요청목록</button>
+                    <button onclick="switchTechSubTab('navi')" id="tech-sub-navi" class="px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-800 text-slate-300 hover:text-white flex items-center gap-1">
+                        <span>🧭</span> 내비게이션
+                    </button>
+                </div>
+            </header>
+
+            <!-- [업체 TAB 1] 실시간 수리 요청 리스트 & 견적 입찰 -->
+            <section id="tech-panel-requests" class="p-5 flex-1 overflow-y-auto space-y-4 bg-slate-50">
+                <div class="flex items-center justify-between">
+                    <h3 class="font-bold text-sm text-slate-800">내 주변 신규 고장 접수 <span class="text-blue-600" id="tech-req-count">3</span>건</h3>
+                    <span class="text-xs text-slate-500">반경 5km 이내</span>
+                </div>
+
+                <!-- 업체용 요청 카드 목록 -->
+                <div id="tech-requests-list" class="space-y-3">
+                    <!-- JS로 렌더링 -->
+                </div>
+            </section>
+
+            <!-- [업체 TAB 2] 수리 기사 전용 턴바이턴(Turn-by-Turn) 내비게이션 -->
+            <section id="tech-panel-navi" class="hidden flex-1 flex flex-col bg-slate-950 text-white">
+                <!-- 상단 TBT(다음 회전 안내) 배너 (카카오내비/티맵 스타일) -->
+                <div class="bg-emerald-600 p-4 flex items-center gap-4 shadow-lg">
+                    <div id="tbt-arrow-box" class="w-14 h-14 bg-emerald-700/80 rounded-2xl flex items-center justify-center text-3xl font-extrabold border border-emerald-400/40 shrink-0">
+                        ↱
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-baseline gap-2">
+                            <span id="tbt-dist" class="text-2xl font-extrabold tracking-tight">300m</span>
+                            <span id="tbt-turn-text" class="text-base font-bold truncate">앞 물금역 사거리 우회전</span>
+                        </div>
+                        <p id="tbt-next-road" class="text-xs text-emerald-100 mt-0.5 truncate">다음 안내: 850m 후 아파트 정문 방면 좌회전</p>
+                    </div>
+                </div>
+
+                <!-- 목적지 요약 바 -->
+                <div class="bg-slate-900 px-4 py-2.5 border-b border-slate-800 flex items-center justify-between text-xs">
+                    <div class="truncate pr-2">
+                        <span class="text-amber-400 font-bold mr-1">[목적지]</span>
+                        <span id="tech-nav-dest" class="text-slate-200 font-medium">경남 양산시 물금읍 범어리 2715</span>
+                    </div>
+                    <button onclick="toggleNavTheme()" class="shrink-0 bg-slate-800 hover:bg-slate-700 text-slate-300 px-2.5 py-1 rounded-md border border-slate-700">
+                        🌓 주간/야간
+                    </button>
+                </div>
+
+                <!-- 내비게이션 지도 캔버스 영역 -->
+                <div id="tech-map-canvas" class="relative flex-1 min-h-[290px] bg-slate-900 overflow-hidden">
+                    <!-- 격자 및 도로 SVG -->
+                    <svg class="w-full h-full" viewBox="0 0 400 280" preserveAspectRatio="none">
+                        <!-- 일반 도로 -->
+                        <path d="M 0 210 L 400 210" stroke="#1e293b" stroke-width="18" />
+                        <path d="M 120 0 L 120 280" stroke="#1e293b" stroke-width="16" />
+                        <path d="M 290 0 L 290 280" stroke="#1e293b" stroke-width="16" />
+                        <path d="M 0 85 L 400 85" stroke="#1e293b" stroke-width="14" />
+
+                        <!-- 권장 경로 외곽선 -->
+                        <path d="M 55 210 L 120 210 L 120 85 L 290 85 L 290 160 L 345 160" fill="none" stroke="#1d4ed8" stroke-width="10" stroke-linecap="round" stroke-linejoin="round" />
+                        <!-- 권장 경로 내부 코어 -->
+                        <path d="M 55 210 L 120 210 L 120 85 L 290 85 L 290 160 L 345 160" fill="none" stroke="#38bdf8" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" />
+                    </svg>
+
+                    <!-- 현재 속도계 (좌측 상단 HUD) -->
+                    <div class="absolute top-3 left-3 bg-slate-900/90 border border-slate-700 rounded-2xl px-3.5 py-2 text-center shadow-lg">
+                        <div id="tech-speed" class="text-2xl font-extrabold text-white leading-none">48</div>
+                        <div class="text-[10px] text-slate-400 font-bold mt-0.5">km/h</div>
+                    </div>
+
+                    <!-- 목적지 깃발 -->
+                    <div class="absolute right-[26px] top-[118px] flex flex-col items-center">
+                        <div class="bg-rose-600 text-white text-[10px] font-bold px-2 py-0.5 rounded shadow">고객 현장</div>
+                        <div class="w-6 h-6 rounded-full bg-rose-600 border-2 border-white flex items-center justify-center text-xs mt-0.5 shadow-lg">🏁</div>
+                    </div>
+
+                    <!-- 내 차량 삼각 내비 커서 -->
+                    <div id="tech-car-marker" class="absolute transition-all duration-300 ease-linear z-10" style="left: 55px; top: 210px; transform: translate(-50%, -50%);">
+                        <div class="w-10 h-10 rounded-full bg-blue-500/30 flex items-center justify-center">
+                            <div class="w-7 h-7 rounded-full bg-sky-400 border-2 border-white shadow-lg flex items-center justify-center text-slate-950 font-extrabold text-sm">
+                                ▲
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 외부 내비 앱 연동 버튼 (실제 앱 구현 시 딥링크 연결 영역) -->
+                    <div class="absolute bottom-3 left-3 right-3 flex items-center justify-between gap-2">
+                        <button onclick="showToast('🟡 카카오내비 앱으로 목적지 좌표를 전송했습니다.')" class="flex-1 bg-[#FEE500] hover:bg-[#f5dc00] text-slate-900 font-extrabold text-xs py-2.5 px-3 rounded-xl shadow-lg flex items-center justify-center gap-1.5 transition">
+                            <span>🗺️</span> 카카오내비 연동
+                        </button>
+                        <button onclick="showToast('🔵 티맵(TMAP) 길안내로 목적지 좌표를 전송했습니다.')" class="flex-1 bg-blue-600 hover:bg-blue-500 text-white font-extrabold text-xs py-2.5 px-3 rounded-xl shadow-lg flex items-center justify-center gap-1.5 transition">
+                            <span>🧭</span> 티맵(TMAP) 연동
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 하단 내비게이션 계기판 (남은 시간/거리 & 모의 주행 제어) -->
+                <div class="bg-slate-900 p-4 border-t border-slate-800 space-y-3">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-baseline gap-3">
+                            <div>
+                                <span class="text-xs text-slate-400 block">남은 시간</span>
+                                <span id="tech-remain-time" class="text-xl font-extrabold text-amber-400">8분</span>
+                            </div>
+                            <div class="h-6 w-px bg-slate-700"></div>
+                            <div>
+                                <span class="text-xs text-slate-400 block">남은 거리</span>
+                                <span id="tech-remain-dist" class="text-xl font-extrabold text-white">2.4 km</span>
+                            </div>
+                        </div>
+                        <button onclick="toggleNavSimulation()" id="btn-tech-sim" class="bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-extrabold text-xs px-4 py-3 rounded-xl shadow-lg transition">
+                            ▶ 모의 주행 시작
+                        </button>
+                    </div>
+
+                    <button onclick="completeRepairJob()" class="w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs rounded-xl border border-slate-700 transition">
+                        ✅ 현장 도착 완료 알림 보내기
+                    </button>
+                </div>
+            </section>
+        </div>
+
+        <!-- 업체 견적 작성 모달 -->
+        <div id="quote-modal" class="hidden absolute inset-0 bg-slate-900/70 backdrop-blur-xs z-40 flex items-end sm:items-center justify-center p-4">
+            <div class="bg-white w-full rounded-3xl p-5 space-y-4 shadow-2xl animate-fade-in">
+                <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                    <h3 class="font-bold text-base text-slate-900">견적서 발송하기</h3>
+                    <button onclick="closeQuoteModal()" class="text-slate-400 hover:text-slate-600 text-lg font-bold">✕</button>
+                </div>
+                <div id="modal-req-summary" class="bg-slate-50 p-3 rounded-xl text-xs text-slate-600">
+                    <!-- 선택된 요청 요약 -->
+                </div>
+                <div class="space-y-3">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">예상 수리 금액 (출장비 포함, 원)</label>
+                        <input type="number" id="modal-price" value="70000" step="5000" class="w-full p-2.5 border border-slate-200 rounded-xl text-sm font-bold text-blue-600">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">방문 가능 소요 시간</label>
+                        <select id="modal-eta" class="w-full p-2.5 border border-slate-200 rounded-xl text-sm">
+                            <option value="약 10분 내 도착 가능">즉시 출발 (약 10분 내 도착)</option>
+                            <option value="약 30분 내 도착 가능">30분 내 방문 가능</option>
+                            <option value="오늘 오후 3시 방문 가능">오늘 오후 3시 방문 가능</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">고객에게 전할 어필 메시지</label>
+                        <textarea id="modal-note" rows="2" class="w-full p-2.5 border border-slate-200 rounded-xl text-xs">정품 냉매 및 주요 부품 항시 보유 중입니다. 추가 비용 없이 깔끔하게 수리해 드립니다.</textarea>
+                    </div>
+                </div>
+                <button onclick="submitTechQuote()" class="w-full py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-sm shadow-lg">
+                    이 조건으로 견적 보내기
+                </button>
+            </div>
+        </div>
+
+    </main>
+
+    <script>
+        // =========================================================================
+        // 앱 전역 상태 관리 (State)
+        // =========================================================================
+        const appState = {
+            role: 'customer', // 'customer' | 'tech'
+            customerStep: 1,  // 1: 접수, 2: 견적비교, 3: 내비추적
+            brand: '삼성전자',
+            type: '스탠드형',
+            symptoms: ['찬바람이 안 나와요'],
+            address: '경남 양산시 물금읍 범어리 2715 (물금신도시)',
+            memo: '에어컨을 켜면 송풍만 나오고 시원해지지 않습니다. 오늘 빠른 방문 원해요.',
+            quotes: [],
+            selectedQuote: null,
+            // 샘플 요청 목록 (업체 화면용)
+            requests: [
+                {
+                    id: 'req-sample-1',
+                    isUser: false,
+                    brand: 'LG전자',
+                    type: '벽걸이형',
+                    symptoms: ['실내기에서 물이 새요'],
+                    address: '경남 양산시 중부동 양산역 인근',
+                    distance: '1.2km',
+                    timeAgo: '4분 전',
+                    memo: '벽걸이 에어컨 아래로 물이 똑똑 떨어집니다.',
+                    quoted: false
+                },
+                {
+                    id: 'req-sample-2',
+                    isUser: false,
+                    brand: '캐리어',
+                    type: '2in1 (스탠드+벽걸이)',
+                    symptoms: ['에러코드 표시됨', '찬바람이 안 나와요'],
+                    address: '경남 양산시 동면 석산리',
+                    distance: '3.6km',
+                    timeAgo: '11분 전',
+                    memo: 'E4 에러가 뜨면서 실외기가 안 돕니다.',
+                    quoted: false
+                }
+            ],
+            // 내비게이션 시뮬레이션 상태
+            navProgress: 0, // 0 ~ 100 (%)
+            navInterval: null,
+            navDarkTheme: true,
+            activeModalReqId: null
+        };
+
+        // =========================================================================
+        // 유틸리티 & 알림
+        // =========================================================================
+        function showToast(msg, icon = '✅') {
+            const box = document.getElementById('toast-box');
+            document.getElementById('toast-text').innerText = msg;
+            document.getElementById('toast-icon').innerText = icon;
+            box.classList.remove('opacity-0', '-translate-y-2');
+            box.classList.add('opacity-100', 'translate-y-0');
+            clearTimeout(window.toastTimer);
+            window.toastTimer = setTimeout(() => {
+                box.classList.remove('opacity-100', 'translate-y-0');
+                box.classList.add('opacity-0', '-translate-y-2');
+            }, 3000);
+        }
+
+        // =========================================================================
+        // 1. 모드 전환 (고객 <-> 수리 업체)
+        // =========================================================================
+        function switchRole(role) {
+            appState.role = role;
+            const custView = document.getElementById('view-customer');
+            const techView = document.getElementById('view-tech');
+            const btnCust = document.getElementById('btn-mode-customer');
+            const btnTech = document.getElementById('btn-mode-tech');
+
+            if (role === 'customer') {
+                custView.classList.remove('hidden');
+                techView.classList.add('hidden');
+                btnCust.className = 'py-2 px-3 rounded-lg text-xs sm:text-sm font-bold transition flex items-center justify-center gap-1.5 bg-blue-600 text-white shadow';
+                btnTech.className = 'py-2 px-3 rounded-lg text-xs sm:text-sm font-bold transition flex items-center justify-center gap-1.5 text-slate-300 hover:text-white';
+            } else {
+                custView.classList.add('hidden');
+                techView.classList.remove('hidden');
+                document.getElementById('tech-badge').classList.add('hidden');
+                btnTech.className = 'py-2 px-3 rounded-lg text-xs sm:text-sm font-bold transition flex items-center justify-center gap-1.5 bg-amber-500 text-slate-950 shadow';
+                btnCust.className = 'py-2 px-3 rounded-lg text-xs sm:text-sm font-bold transition flex items-center justify-center gap-1.5 text-slate-300 hover:text-white';
+                renderTechRequests();
+                
+                // 이미 매칭된 건이 있으면 내비게이션 목적지 동기화
+                if (appState.selectedQuote) {
+                    document.getElementById('tech-nav-dest').innerText = appState.address;
+                }
+            }
+        }
+
+        // =========================================================================
+        // 2. 고객 화면 로직 (견적 요청 -> 비교 -> 업체 선택)
+        // =========================================================================
+        function selectOption(category, value, btnEl) {
+            appState[category] = value;
+            const selector = category === 'brand' ? '.opt-brand' : '.opt-type';
+            document.querySelectorAll(selector).forEach(btn => {
+                btn.className = `${selector.slice(1)} py-2.5 px-3 rounded-xl border border-slate-200 bg-white text-slate-600 font-medium text-sm hover:bg-slate-50 transition`;
+            });
+            btnEl.className = `${selector.slice(1)} py-2.5 px-3 rounded-xl border-2 border-blue-600 bg-blue-50 text-blue-700 font-bold text-sm transition`;
+        }
+
+        function toggleSymptom(symptom, btnEl) {
+            const idx = appState.symptoms.indexOf(symptom);
+            if (idx > -1) {
+                if (appState.symptoms.length === 1) {
+                    showToast('최소 1개 이상의 고장 증상을 선택해 주세요.', '⚠️');
+                    return;
+                }
+                appState.symptoms.splice(idx, 1);
+                btnEl.className = 'sym-btn py-2 px-3.5 rounded-full border border-slate-200 bg-white text-slate-600 font-medium text-xs hover:bg-slate-50 transition';
+            } else {
+                appState.symptoms.push(symptom);
+                btnEl.className = 'sym-btn py-2 px-3.5 rounded-full border-2 border-blue-600 bg-blue-50 text-blue-700 font-bold text-xs transition';
+            }
+        }
+
+        function submitCustomerRequest() {
+            const addrInput = document.getElementById('input-address').value.trim();
+            const memoInput = document.getElementById('input-memo').value.trim();
+            if (!addrInput) {
+                showToast('방문 받으실 주소를 입력해 주세요.', '📍');
+                return;
+            }
+            appState.address = addrInput;
+            appState.memo = memoInput;
+
+            // 1) 업체 화면의 요청 목록 최상단에 고객 요청 추가
+            appState.requests = appState.requests.filter(r => !r.isUser);
+            appState.requests.unshift({
+                id: 'req-user-main',
+                isUser: true,
+                brand: appState.brand,
+                type: appState.type,
+                symptoms: [...appState.symptoms],
+                address: appState.address,
+                distance: '2.4km',
+                timeAgo: '방금 전',
+                memo: appState.memo || '빠른 방문 수리 부탁드립니다.',
+                quoted: false
+            });
+            document.getElementById('tech-badge').classList.remove('hidden');
+
+            // 2) 주변 수리 업체 3곳의 가상 견적서 자동 생성
+            const basePrice = appState.symptoms.includes('냉매 가스 충전 필요') ? 80000 : 65000;
+            appState.quotes = [
+                {
+                    id: 'q1',
+                    shopName: '양산쿨에어컨',
+                    techName: '김민수 마스터 기사 · 경력 12년',
+                    rating: 4.9,
+                    reviews: 148,
+                    distanceKm: 2.4,
+                    etaText: '약 8분 후 도착 가능',
+                    price: basePrice + 10000,
+                    badge: '가까운 거리',
+                    message: `출장비 포함 금액입니다. ${appState.brand} ${appState.type} 전용 냉매와 정품 센서를 차량에 보유 중이라 즉시 수리 가능합니다.`
+                },
+                {
+                    id: 'q2',
+                    shopName: '번개냉난방설비',
+                    techName: '박성호 대표 기사 · 경력 9년',
+                    rating: 4.8,
+                    reviews: 92,
+                    distanceKm: 3.1,
+                    etaText: '약 15분 후 도착 가능',
+                    price: basePrice,
+                    badge: '최저가 견적',
+                    message: '거품 없는 정찰제로 수리해 드립니다. 점검 후 불필요한 부품 교체는 절대 권하지 않습니다.'
+                },
+                {
+                    id: 'q3',
+                    shopName: '명품가전케어 센터',
+                    techName: '이정훈 엔지니어 · 서비스센터 출신',
+                    rating: 5.0,
+                    reviews: 215,
+                    distanceKm: 4.2,
+                    etaText: '약 20분 후 도착 가능',
+                    price: basePrice + 20000,
+                    badge: '평점 5.0 우수',
+                    message: '제조사 서비스센터 10년 근무 경력입니다. 수리 후 1년 무상 A/S 보증서를 발행해 드립니다.'
+                }
+            ];
+
+            // 요약 정보 업데이트
+            document.getElementById('summary-title').innerText = `${appState.brand} ${appState.type} · ${appState.symptoms.join(', ')}`;
+            document.getElementById('summary-addr').innerText = `📍 ${appState.address}`;
+
+            sortQuotes('price');
+            goToCustomerStep(2);
+            showToast('주변 수리 업체 3곳에서 실시간 견적이 도착했습니다!', '🎉');
+        }
+
+        function sortQuotes(criteria) {
+            const btnPrice = document.getElementById('sort-price');
+            const btnDist = document.getElementById('sort-dist');
+            if (criteria === 'price') {
+                appState.quotes.sort((a, b) => a.price - b.price);
+                btnPrice.className = 'px-2.5 py-1 rounded-lg bg-blue-100 text-blue-700 font-bold';
+                btnDist.className = 'px-2.5 py-1 rounded-lg bg-slate-100 text-slate-600 font-medium';
+            } else {
+                appState.quotes.sort((a, b) => a.distanceKm - b.distanceKm);
+                btnDist.className = 'px-2.5 py-1 rounded-lg bg-blue-100 text-blue-700 font-bold';
+                btnPrice.className = 'px-2.5 py-1 rounded-lg bg-slate-100 text-slate-600 font-medium';
+            }
+            renderQuotes();
+        }
+
+        function renderQuotes() {
+            const listEl = document.getElementById('quotes-list');
+            document.getElementById('quote-count').innerText = appState.quotes.length;
+            listEl.innerHTML = appState.quotes.map(q => `
+                <div class="border border-slate-200 rounded-2xl p-4 bg-white shadow-xs hover:border-blue-400 transition space-y-3">
+                    <div class="flex items-start justify-between">
+                        <div>
+                            <div class="flex items-center gap-1.5">
+                                <span class="text-[11px] font-bold bg-blue-50 text-blue-600 px-2 py-0.5 rounded-md">${q.badge}</span>
+                                <span class="text-xs font-bold text-amber-500">★ ${q.rating} <span class="text-slate-400 font-normal">(${q.reviews})</span></span>
+                            </div>
+                            <h4 class="font-bold text-base text-slate-900 mt-1">${q.shopName}</h4>
+                            <p class="text-xs text-slate-500">${q.techName}</p>
+                        </div>
+                        <div class="text-right">
+                            <span class="text-[11px] font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">📍 ${q.distanceKm}km</span>
+                            <p class="font-extrabold text-lg text-slate-900 mt-1">${q.price.toLocaleString()}원</p>
+                        </div>
+                    </div>
+                    <p class="text-xs text-slate-600 bg-slate-50 p-2.5 rounded-xl leading-relaxed">"${q.message}"</p>
+                    <div class="flex items-center justify-between pt-1">
+                        <span class="text-xs font-bold text-blue-600">🚐 ${q.etaText}</span>
+                        <button onclick="selectQuote('${q.id}')" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow transition">
+                            이 업체 선택하기
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function selectQuote(quoteId) {
+            const chosen = appState.quotes.find(q => q.id === quoteId);
+            if (!chosen) return;
+            appState.selectedQuote = chosen;
+
+            // 고객 STEP 3 UI 세팅
+            document.getElementById('matched-shop-name').innerText = `${chosen.shopName} 기사님 출발`;
+            document.getElementById('detail-shop-name').innerText = chosen.shopName;
+            document.getElementById('detail-shop-rating').innerText = chosen.rating;
+            document.getElementById('detail-shop-tech').innerText = chosen.techName;
+            document.getElementById('detail-shop-price').innerText = `${chosen.price.toLocaleString()}원`;
+            document.getElementById('detail-shop-msg').innerText = `"${chosen.message}"`;
+
+            // 업체 내비게이션 목적지 동기화
+            document.getElementById('tech-nav-dest').innerText = appState.address;
+
+            // 내비게이션 위치 초기화 후 자동 시뮬레이션 시작
+            resetNavProgress();
+            goToCustomerStep(3);
+            startNavSimulation();
+            showToast(`${chosen.shopName} 매칭 완료! 기사님 실시간 위치 안내를 시작합니다.`, '🚐');
+        }
+
+        function goToCustomerStep(step) {
+            appState.customerStep = step;
+            [1, 2, 3].forEach(s => {
+                const sec = document.getElementById(`cust-step-${s}`);
+                const tab = document.getElementById(`cust-tab-${s}`);
+                if (s === step) {
+                    sec.classList.remove('hidden');
+                    tab.className = 'py-2.5 border-b-2 border-blue-600 text-blue-600 font-bold';
+                } else {
+                    sec.classList.add('hidden');
+                    tab.className = 'py-2.5 border-b-2 border-transparent text-slate-400';
+                }
+            });
+            const stepNames = { 1: '1단계: 고장 접수', 2: '2단계: 견적 비교', 3: '3단계: 실시간 이동' };
+            document.getElementById('customer-step-badge').innerText = stepNames[step];
+        }
+
+        // =========================================================================
+        // 3. 업체 화면 로직 (요청 확인 -> 견적 발송 -> 내비게이션)
+        // =========================================================================
+        function switchTechSubTab(tab) {
+            const reqPanel = document.getElementById('tech-panel-requests');
+            const naviPanel = document.getElementById('tech-panel-navi');
+            const btnReq = document.getElementById('tech-sub-req');
+            const btnNavi = document.getElementById('tech-sub-navi');
+
+            if (tab === 'requests') {
+                reqPanel.classList.remove('hidden');
+                naviPanel.classList.add('hidden');
+                btnReq.className = 'px-3 py-1.5 rounded-lg text-xs font-bold bg-blue-600 text-white';
+                btnNavi.className = 'px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-800 text-slate-300 hover:text-white flex items-center gap-1';
+                renderTechRequests();
+            } else {
+                reqPanel.classList.add('hidden');
+                naviPanel.classList.remove('hidden');
+                btnNavi.className = 'px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-500 text-slate-950 flex items-center gap-1';
+                btnReq.className = 'px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-800 text-slate-300 hover:text-white';
+            }
+        }
+
+        function renderTechRequests() {
+            const container = document.getElementById('tech-requests-list');
+            document.getElementById('tech-req-count').innerText = appState.requests.length;
+
+            container.innerHTML = appState.requests.map(req => `
+                <div class="bg-white border ${req.isUser ? 'border-blue-400 ring-2 ring-blue-100' : 'border-slate-200'} rounded-2xl p-4 shadow-xs space-y-3">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-1.5">
+                            ${req.isUser ? '<span class="bg-rose-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">방금 접수됨</span>' : ''}
+                            <span class="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md">${req.brand} · ${req.type}</span>
+                        </div>
+                        <span class="text-xs text-slate-400">${req.timeAgo} · <strong>${req.distance}</strong></span>
+                    </div>
+                    <div>
+                        <h4 class="font-bold text-sm text-slate-900">${req.symptoms.join(', ')}</h4>
+                        <p class="text-xs text-slate-500 mt-1">📍 ${req.address}</p>
+                        <p class="text-xs text-slate-600 bg-slate-50 p-2.5 rounded-xl mt-2">"${req.memo}"</p>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2 pt-1">
+                        <button onclick="openQuoteModal('${req.id}')" class="py-2.5 px-3 ${req.quoted ? 'bg-slate-200 text-slate-600' : 'bg-blue-600 hover:bg-blue-700 text-white'} font-bold text-xs rounded-xl transition">
+                            ${req.quoted ? '✓ 견적 발송 완료' : '💰 견적서 보내기'}
+                        </button>
+                        <button onclick="startTechNavigationTo('${req.address}')" class="py-2.5 px-3 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1 transition">
+                            <span>🧭</span> 바로 길안내
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function openQuoteModal(reqId) {
+            const req = appState.requests.find(r => r.id === reqId);
+            if (!req) return;
+            appState.activeModalReqId = reqId;
+            document.getElementById('modal-req-summary').innerHTML = `
+                <strong>${req.brand} ${req.type}</strong> (${req.symptoms.join(', ')})<br>
+                📍 ${req.address}
+            `;
+            document.getElementById('quote-modal').classList.remove('hidden');
+        }
+
+        function closeQuoteModal() {
+            document.getElementById('quote-modal').classList.add('hidden');
+        }
+
+        function submitTechQuote() {
+            const price = parseInt(document.getElementById('modal-price').value || '70000', 10);
+            const eta = document.getElementById('modal-eta').value;
+            const note = document.getElementById('modal-note').value;
+
+            const req = appState.requests.find(r => r.id === appState.activeModalReqId);
+            if (req) {
+                req.quoted = true;
+                // 만약 고객이 방금 올린 요청이라면 고객 견적 리스트에도 실시간 반영
+                if (req.isUser) {
+                    const existing = appState.quotes.find(q => q.shopName === '양산쿨에어컨');
+                    if (existing) {
+                        existing.price = price;
+                        existing.etaText = eta;
+                        existing.message = note;
+                    }
+                    renderQuotes();
+                }
+            }
+            closeQuoteModal();
+            renderTechRequests();
+            showToast(`고객에게 ${price.toLocaleString()}원 견적서를 발송했습니다!`, '📨');
+        }
+
+        function startTechNavigationTo(address) {
+            document.getElementById('tech-nav-dest').innerText = address;
+            switchTechSubTab('navi');
+            resetNavProgress();
+            startNavSimulation();
+            showToast('목적지까지 턴바이턴 길안내를 시작합니다.', '🧭');
+        }
+
+        function toggleNavTheme() {
+            appState.navDarkTheme = !appState.navDarkTheme;
+            const canvas = document.getElementById('tech-map-canvas');
+            if (appState.navDarkTheme) {
+                canvas.classList.remove('bg-slate-200');
+                canvas.classList.add('bg-slate-900');
+            } else {
+                canvas.classList.remove('bg-slate-900');
+                canvas.classList.add('bg-slate-200');
+            }
+        }
+
+        // =========================================================================
+        // 4. 실시간 내비게이션 경로 이동 시뮬레이션 (고객/업체 화면 동기화)
+        // =========================================================================
+        // 경로 웨이포인트 (SVG 400x250 / 400x280 비율 기반)
+        const routeWaypoints = [
+            { pct: 0,   x: 55,  yCust: 180, yTech: 210, arrow: '↱', dist: '300m', turn: '앞 물금역 사거리 우회전', next: '물금대로 직진 후 좌회전', speed: 42 },
+            { pct: 20,  x: 120, yCust: 180, yTech: 210, arrow: '↑', dist: '1.8km', turn: '물금대로 방면 직진', next: '1.1km 앞 범어사거리 우회전', speed: 56 },
+            { pct: 50,  x: 120, yCust: 70,  yTech: 85,  arrow: '↱', dist: '250m', turn: '앞 범어사거리 우회전', next: '단지 진입로 방면 우회전', speed: 48 },
+            { pct: 80,  x: 290, yCust: 70,  yTech: 85,  arrow: '↳', dist: '120m', turn: '앞 아파트 정문 좌회전', next: '잠시 후 목적지 도착', speed: 28 },
+            { pct: 92,  x: 290, yCust: 140, yTech: 160, arrow: '🏁', dist: '30m',  turn: '전방 목적지 부근입니다', next: '안전을 위해 서행하세요', speed: 15 },
+            { pct: 100, x: 345, yCust: 140, yTech: 160, arrow: '✅', dist: '도착',  turn: '목적지에 도착했습니다', next: '고객님께 도착 알림 전송됨', speed: 0 }
+        ];
+
+        function resetNavProgress() {
+            stopNavSimulation();
+            appState.navProgress = 0;
+            updateNavigationUI(0);
+        }
+
+        function toggleNavSimulation() {
+            if (appState.navInterval) {
+                stopNavSimulation();
+            } else {
+                if (appState.navProgress >= 100) {
+                    appState.navProgress = 0;
+                }
+                startNavSimulation();
+            }
+        }
+
+        function startNavSimulation() {
+            stopNavSimulation();
+            document.getElementById('btn-cust-sim').innerText = '⏸ 일시정지';
+            document.getElementById('btn-tech-sim').innerText = '⏸ 주행 일시정지';
+
+            appState.navInterval = setInterval(() => {
+                appState.navProgress += 2;
+                if (appState.navProgress >= 100) {
+                    appState.navProgress = 100;
+                    updateNavigationUI(100);
+                    stopNavSimulation();
+                    showToast('기사님이 고객님 댁에 도착했습니다!', '🎉');
+                } else {
+                    updateNavigationUI(appState.navProgress);
+                }
+            }, 250);
+        }
+
+        function stopNavSimulation() {
+            if (appState.navInterval) {
+                clearInterval(appState.navInterval);
+                appState.navInterval = null;
+            }
+            const btnCust = document.getElementById('btn-cust-sim');
+            const btnTech = document.getElementById('btn-tech-sim');
+            if (btnCust) btnCust.innerText = appState.navProgress >= 100 ? '↻ 다시 주행' : '▶ 이동 시뮬레이션';
+            if (btnTech) btnTech.innerText = appState.navProgress >= 100 ? '↻ 다시 주행' : '▶ 모의 주행 시작';
+        }
+
+        function updateNavigationUI(pct) {
+            // 현재 구간 보간 계산
+            let startWp = routeWaypoints[0];
+            let endWp = routeWaypoints[routeWaypoints.length - 1];
+            for (let i = 0; i < routeWaypoints.length - 1; i++) {
+                if (pct >= routeWaypoints[i].pct && pct <= routeWaypoints[i + 1].pct) {
+                    startWp = routeWaypoints[i];
+                    endWp = routeWaypoints[i + 1];
+                    break;
+                }
+            }
+            const segRange = (endWp.pct - startWp.pct) || 1;
+            const localRatio = (pct - startWp.pct) / segRange;
+
+            const curX = startWp.x + (endWp.x - startWp.x) * localRatio;
+            const curYCust = startWp.yCust + (endWp.yCust - startWp.yCust) * localRatio;
+            const curYTech = startWp.yTech + (endWp.yTech - startWp.yTech) * localRatio;
+
+            // SVG 400 기준 퍼센트 좌표로 변환해 반응형 대응
+            const leftPct = (curX / 400) * 100;
+            const topCustPct = (curYCust / 250) * 100;
+            const topTechPct = (curYTech / 280) * 100;
+
+            const custCar = document.getElementById('cust-car-marker');
+            if (custCar) {
+                custCar.style.left = `${leftPct}%`;
+                custCar.style.top = `${topCustPct}%`;
+            }
+
+            const techCar = document.getElementById('tech-car-marker');
+            if (techCar) {
+                techCar.style.left = `${leftPct}%`;
+                techCar.style.top = `${topTechPct}%`;
+            }
+
+            // 남은 거리 및 시간 계산
+            const remainKm = Math.max(0, (2.4 * (1 - pct / 100))).toFixed(1);
+            const remainMin = Math.max(0, Math.ceil(8 * (1 - pct / 100)));
+
+            document.getElementById('cust-remain-dist').innerText = `${remainKm} km`;
+            document.getElementById('cust-eta-badge').innerText = pct >= 100 ? '현장 도착 완료!' : `약 ${remainMin}분 후 도착`;
+            document.getElementById('cust-nav-status-text').innerText = pct >= 100 ? '기사님이 도착하여 점검을 준비 중입니다' : startWp.turn;
+
+            document.getElementById('tech-remain-dist').innerText = `${remainKm} km`;
+            document.getElementById('tech-remain-time').innerText = pct >= 100 ? '도착' : `${remainMin}분`;
+            document.getElementById('tbt-arrow-box').innerText = startWp.arrow;
+            document.getElementById('tbt-dist').innerText = startWp.dist;
+            document.getElementById('tbt-turn-text').innerText = startWp.turn;
+            document.getElementById('tbt-next-road').innerText = `다음 안내: ${startWp.next}`;
+            document.getElementById('tech-speed').innerText = startWp.speed;
+
+            // 고객 화면 3단계 타임라인 상태 업데이트
+            const s2 = document.getElementById('status-step-2');
+            const s3 = document.getElementById('status-step-3');
+            if (pct >= 100) {
+                s2.className = 'p-2.5 rounded-xl bg-blue-50 border border-blue-200 text-blue-700';
+                s3.className = 'p-2.5 rounded-xl bg-emerald-600 text-white shadow';
+            } else {
+                s2.className = 'p-2.5 rounded-xl bg-blue-600 text-white shadow';
+                s3.className = 'p-2.5 rounded-xl bg-slate-100 text-slate-400';
+            }
+        }
+
+        function completeRepairJob() {
+            stopNavSimulation();
+            appState.navProgress = 100;
+            updateNavigationUI(100);
+            showToast('고객 앱으로 "현장 도착 완료" 푸시 알림을 보냈습니다!', '🔔');
+        }
+
+        function resetApp() {
+            stopNavSimulation();
+            appState.navProgress = 0;
+            appState.selectedQuote = null;
+            switchRole('customer');
+            goToCustomerStep(1);
+            showToast('시뮬레이터가 초기 상태로 리셋되었습니다.', '🔄');
+        }
+
+        // 초기 렌더링
+        window.onload = () => {
+            renderTechRequests();
+        };
+    </script>
+</body>
+</html>
